@@ -113,6 +113,27 @@ jobs:
             tests/com/smarttoolbox/pro/EdgeSwipeLogicTest.java
           java -cp build/edge-tests com.smarttoolbox.pro.EdgeSwipeLogicTest
 
+      - name: Verify resizable floating toolbox panel and Java sizing tests
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/ToolboxPanelSize.java"
+          grep -q 'floating.toolbox.width_dp' "$src/FloatingIconSettingsActivity.java"
+          grep -q 'floating.toolbox.height_dp' "$src/FloatingIconSettingsActivity.java"
+          grep -q 'Toolbox width:' "$src/FloatingIconSettingsActivity.java"
+          grep -q 'Maximum toolbox height:' "$src/FloatingIconSettingsActivity.java"
+          grep -q 'Reset toolbox size' "$src/FloatingIconSettingsActivity.java"
+          grep -q 'ToolboxPanelSize.fitToScreenPx' "$src/FloatingControlService.java"
+          grep -q 'ToolboxPanelSize.clampTopY' "$src/FloatingControlService.java"
+          test -f tests/com/smarttoolbox/pro/ToolboxPanelSizeTest.java
+          mkdir -p build/toolbox-size-tests
+          javac -d build/toolbox-size-tests \
+            "$src/ToolboxPanelSize.java" \
+            tests/com/smarttoolbox/pro/ToolboxPanelSizeTest.java
+          java -cp build/toolbox-size-tests com.smarttoolbox.pro.ToolboxPanelSizeTest
+
       - name: Verify SR branding and developer profile
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -127,8 +148,8 @@ jobs:
           grep -q 'AboutDeveloperActivity' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
           grep -q 'android:name=".AboutDeveloperActivity"' app/src/main/AndroidManifest.xml
           grep -q "applicationId 'com.smarttoolbox.pro'" app/build.gradle
-          grep -q 'versionCode 20' app/build.gradle
-          grep -q "versionName '1.4.5-alpha20'" app/build.gradle
+          grep -q 'versionCode 22' app/build.gradle
+          grep -q "versionName '1.4.7-alpha22'" app/build.gradle
 
       - name: Verify smart three-dot menu and home navigation
         working-directory: ${{ env.PROJECT_DIR }}
@@ -182,8 +203,17 @@ jobs:
           grep -q 'private VideoFolderGridAdapter folderGridAdapter;' "$java_dir/VideoLibraryActivity.java"
           grep -q 'MODE_CONTINUE' "$java_dir/VideoLibraryActivity.java"
           grep -q 'VideoResumeStore.get' "$java_dir/VideoLibraryActivity.java"
-          grep -q 'versionCode 20' app/build.gradle
-          grep -q "versionName '1.4.5-alpha20'" app/build.gradle
+          test -f "$java_dir/VideoThumbnailLoader.java"
+          grep -q 'ContentResolver' "$java_dir/VideoThumbnailLoader.java"
+          grep -q 'loadThumbnail(uri' "$java_dir/VideoThumbnailLoader.java"
+          grep -q 'VideoResumeStore.get' "$java_dir/VideoLibraryActivity.java"
+          grep -q 'EXTRA_CONTINUE_LAST' "$java_dir/VideoLibraryActivity.java"
+          grep -q 'EXTRA_CONTINUE_LAST' "$java_dir/VideoPlayerActivity.java"
+          grep -q 'showVideoOptions' "$java_dir/VideoLibraryActivity.java"
+          grep -q 'continueButton' "$java_dir/VideoLibraryActivity.java"
+          grep -q 'thumbnails.load(holder.thumbnail' "$java_dir/VideoLibraryActivity.java"
+          grep -q 'versionCode 22' app/build.gradle
+          grep -q "versionName '1.4.7-alpha22'" app/build.gradle
           mkdir -p build/theme-folder-tests
           javac -d build/theme-folder-tests \
             "$java_dir/ThemePalette.java" \
