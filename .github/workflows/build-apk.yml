@@ -20,25 +20,70 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Prepare Android project (ZIP or source files)
+      - name: Prepare Android project (source tree or source ZIP)
         shell: bash
         run: |
           set -euo pipefail
+
+          project_dir=""
           if [ -f app/build.gradle ]; then
-            project_dir=.
+            project_dir="."
           elif [ -f SmartToolboxPro/app/build.gradle ]; then
-            project_dir=SmartToolboxPro
-          elif [ -f SmartToolboxPro_GitHub.zip ]; then
-            mkdir -p source
-            unzip -q -o SmartToolboxPro_GitHub.zip -d source
-            project_dir=source/SmartToolboxPro
+            project_dir="SmartToolboxPro"
           else
-            echo 'Android source project or SmartToolboxPro_GitHub.zip was not found.'
+            mkdir -p source
+            shopt -s nullglob
+            source_archives=()
+
+            # Only ZIPs containing an Android app module count as source archives.
+            for archive in ./*.zip; do
+              if unzip -Z1 "$archive" | grep -Eq '(^|/)app/build.gradle$'; then
+                source_archives+=("$archive")
+              fi
+            done
+
+            if [ "${#source_archives[@]}" -ne 1 ]; then
+              echo "Expected exactly one Android source ZIP containing app/build.gradle; found ${#source_archives[@]}."
+              echo "The ZIP must contain app/, settings.gradle and app/src/main/AndroidManifest.xml."
+              echo "A ZIP containing only MP4 / PNG / TXT media assets is not an Android source project."
+              echo "ZIP files found in repository:"
+              for archive in ./*.zip; do
+                [ -f "$archive" ] || continue
+                echo "--- $archive"
+                unzip -Z1 "$archive" | head -n 12 || true
+              done
+              exit 1
+            fi
+
+            archive="${source_archives[0]}"
+            extraction_dir="source/$(basename "${archive%.zip}")"
+            mkdir -p "$extraction_dir"
+            unzip -q -o "$archive" -d "$extraction_dir"
+
+            mapfile -t project_roots < <(
+              find "$extraction_dir" -type f -path '*/app/build.gradle' -print |
+              while IFS= read -r gradle_file; do
+                dirname "$(dirname "$gradle_file")"
+              done | sort -u
+            )
+
+            if [ "${#project_roots[@]}" -ne 1 ]; then
+              echo "Could not identify exactly one Android project root inside $archive."
+              printf '%s\\n' "${project_roots[@]}"
+              exit 1
+            fi
+            project_dir="${project_roots[0]}"
+          fi
+
+          test -f "$project_dir/app/build.gradle"
+          if [ ! -f "$project_dir/settings.gradle" ] && [ ! -f "$project_dir/settings.gradle.kts" ]; then
+            echo "Android project is incomplete: settings.gradle or settings.gradle.kts is missing."
             exit 1
           fi
-          test -f "$project_dir/app/build.gradle"
+          test -f "$project_dir/app/src/main/AndroidManifest.xml"
+
           echo "PROJECT_DIR=$project_dir" >> "$GITHUB_ENV"
-          echo "Building project in: $project_dir"
+          echo "Building Android project in: $project_dir"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -52,12 +97,12 @@ jobs:
           packages: 'platform-tools'
 
       - name: Install Android platform and build tools
-        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+        run: sdkmanager --install "platforms;android-36" "build-tools;35.0.0"
 
-      - name: Set up Gradle 8.9
+      - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: '8.9'
+          gradle-version: '8.11.1'
 
       - name: Test edge-swipe direction and same-side restore
         working-directory: ${{ env.PROJECT_DIR }}
@@ -82,8 +127,8 @@ jobs:
           grep -q 'AboutDeveloperActivity' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
           grep -q 'android:name=".AboutDeveloperActivity"' app/src/main/AndroidManifest.xml
           grep -q "applicationId 'com.smarttoolbox.pro'" app/build.gradle
-          grep -q 'versionCode 14' app/build.gradle
-          grep -q "versionName '1.3.1-alpha14'" app/build.gradle
+          grep -q 'versionCode 15' app/build.gradle
+          grep -q "versionName '1.4.0-alpha15'" app/build.gradle
 
       - name: Verify Android project files
         working-directory: ${{ env.PROJECT_DIR }}
@@ -190,6 +235,52 @@ jobs:
             echo 'The system volume slider must not be changed by this app.'
             exit 1
           fi
+
+      - name: Verify SR Video Player integration and pure-Java tests
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          test -f app/src/main/java/com/smarttoolbox/pro/VideoPlaybackService.java
+          test -f app/src/main/java/com/smarttoolbox/pro/VideoPlayerLogic.java
+          test -f tests/com/smarttoolbox/pro/VideoPlayerLogicTest.java
+          grep -q "def media3Version = '1.11.1'" app/build.gradle
+          grep -q 'androidx.media3:media3-exoplayer:' app/build.gradle
+          grep -q 'androidx.media3:media3-session:' app/build.gradle
+          grep -q 'androidx.media3:media3-ui:' app/build.gradle
+          grep -q 'androidx.media3:media3-exoplayer-hls:' app/build.gradle
+          grep -q 'androidx.media3:media3-exoplayer-dash:' app/build.gradle
+          grep -q 'androidx.media3:media3-exoplayer-smoothstreaming:' app/build.gradle
+          grep -q 'androidx.media3:media3-exoplayer-rtsp:' app/build.gradle
+          grep -q 'android:name=".VideoPlayerActivity"' app/src/main/AndroidManifest.xml
+          grep -q 'android:name=".VideoPlaybackService"' app/src/main/AndroidManifest.xml
+          grep -q 'androidx.media3.session.MediaSessionService' app/src/main/AndroidManifest.xml
+          grep -q 'android:foregroundServiceType="mediaPlayback"' app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK' app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          grep -q 'VideoPlayerActivity.class' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
+          grep -q 'openVideoPlayer' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'setSubtitleConfigurations' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'TrackSelectionOverride' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'enterPictureInPictureMode' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'setFullscreenButtonClickListener' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'setShowShuffleButton' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'setTimeBarScrubbingEnabled' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'scheduleSleepTimer' app/src/main/java/com/smarttoolbox/pro/VideoPlaybackService.java
+          grep -q 'setWakeMode(C.WAKE_MODE_LOCAL)' app/src/main/java/com/smarttoolbox/pro/VideoPlaybackService.java
+          grep -q 'setKeepScreenOn(isPlaying)' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'setFullscreenButtonClickListener' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'getUriFromItem' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'compileSdk 36' app/build.gradle
+          grep -q "version '8.10.0'" build.gradle
+          grep -q 'MediaController.releaseFuture' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'PANEL_IDLE_TIMEOUT_MS = 3000L' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          mkdir -p build/video-player-tests
+          javac -d build/video-player-tests \
+            app/src/main/java/com/smarttoolbox/pro/VideoPlayerLogic.java \
+            tests/com/smarttoolbox/pro/VideoPlayerLogicTest.java
+          java -cp build/video-player-tests com.smarttoolbox.pro.VideoPlayerLogicTest
 
       - name: Verify requested feature updates
         working-directory: ${{ env.PROJECT_DIR }}
