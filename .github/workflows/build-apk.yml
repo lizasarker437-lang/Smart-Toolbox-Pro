@@ -134,6 +134,31 @@ jobs:
             tests/com/smarttoolbox/pro/ToolboxPanelSizeTest.java
           java -cp build/toolbox-size-tests com.smarttoolbox.pro.ToolboxPanelSizeTest
 
+      - name: Verify immersive video playback and deliberate background audio
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          main=app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE' "$main"
+          grep -q 'controller.hide(WindowInsetsCompat.Type.systemBars())' "$main"
+          grep -q 'exitPlayerAndStop()' "$main"
+          grep -q 'exitPlayerKeepingAudio()' "$main"
+          grep -q 'if (!controller.isPlaying()) controller.play()' "$main"
+          grep -q 'registerSystemBack()' "$main"
+          grep -q 'unregisterSystemBack()' "$main"
+          grep -q 'Background audio - exit player' "$main"
+          test -f app/src/main/java/com/smarttoolbox/pro/VideoPlaybackService.java
+          grep -q 'controller.clearMediaItems()' "$main"
+          grep -q 'VideoPlaybackService.stopCurrentPlayback()' "$main"
+          grep -q 'public static void stopCurrentPlayback()' app/src/main/java/com/smarttoolbox/pro/VideoPlaybackService.java
+          test -f tests/com/smarttoolbox/pro/VideoExitPolicyTest.java
+          mkdir -p build/video-exit-tests
+          javac -d build/video-exit-tests \
+            app/src/main/java/com/smarttoolbox/pro/VideoExitPolicy.java \
+            tests/com/smarttoolbox/pro/VideoExitPolicyTest.java
+          java -cp build/video-exit-tests com.smarttoolbox.pro.VideoExitPolicyTest
+
       - name: Verify SR branding and developer profile
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -148,8 +173,8 @@ jobs:
           grep -q 'AboutDeveloperActivity' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
           grep -q 'android:name=".AboutDeveloperActivity"' app/src/main/AndroidManifest.xml
           grep -q "applicationId 'com.smarttoolbox.pro'" app/build.gradle
-          grep -q 'versionCode 22' app/build.gradle
-          grep -q "versionName '1.4.7-alpha22'" app/build.gradle
+          grep -q 'versionCode 23' app/build.gradle
+          grep -q "versionName '1.4.8-alpha23'" app/build.gradle
 
       - name: Verify smart three-dot menu and home navigation
         working-directory: ${{ env.PROJECT_DIR }}
@@ -212,8 +237,8 @@ jobs:
           grep -q 'showVideoOptions' "$java_dir/VideoLibraryActivity.java"
           grep -q 'continueButton' "$java_dir/VideoLibraryActivity.java"
           grep -q 'thumbnails.load(holder.thumbnail' "$java_dir/VideoLibraryActivity.java"
-          grep -q 'versionCode 22' app/build.gradle
-          grep -q "versionName '1.4.7-alpha22'" app/build.gradle
+          grep -q 'versionCode 23' app/build.gradle
+          grep -q "versionName '1.4.8-alpha23'" app/build.gradle
           mkdir -p build/theme-folder-tests
           javac -d build/theme-folder-tests \
             "$java_dir/ThemePalette.java" \
