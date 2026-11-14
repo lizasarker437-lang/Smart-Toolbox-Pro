@@ -127,8 +127,8 @@ jobs:
           grep -q 'AboutDeveloperActivity' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
           grep -q 'android:name=".AboutDeveloperActivity"' app/src/main/AndroidManifest.xml
           grep -q "applicationId 'com.smarttoolbox.pro'" app/build.gradle
-          grep -q 'versionCode 15' app/build.gradle
-          grep -q "versionName '1.4.0-alpha15'" app/build.gradle
+          grep -q 'versionCode 16' app/build.gradle
+          grep -q "versionName '1.4.1-alpha16'" app/build.gradle
 
       - name: Verify Android project files
         working-directory: ${{ env.PROJECT_DIR }}
@@ -264,13 +264,21 @@ jobs:
           grep -q 'setSubtitleConfigurations' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
           grep -q 'TrackSelectionOverride' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
           grep -q 'enterPictureInPictureMode' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
-          grep -q 'setFullscreenButtonClickListener' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
-          grep -q 'setShowShuffleButton' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
-          grep -q 'setTimeBarScrubbingEnabled' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
           grep -q 'scheduleSleepTimer' app/src/main/java/com/smarttoolbox/pro/VideoPlaybackService.java
           grep -q 'setWakeMode(C.WAKE_MODE_LOCAL)' app/src/main/java/com/smarttoolbox/pro/VideoPlaybackService.java
           grep -q 'setKeepScreenOn(isPlaying)' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
-          grep -q 'setFullscreenButtonClickListener' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'playerView.setUseController(false)' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'topPanel' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'quickActions' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'positionSeekBar' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'centerTransport' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'scheduleControlsAutoHide' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'CONTROL_HIDE_DELAY_MS = 3200L' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'PixelCopy.request' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'onDoubleTap' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'onScroll' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'toggleAudioOnly' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE)' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
           grep -q 'getUriFromItem' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
           grep -q 'compileSdk 36' app/build.gradle
           grep -q "version '8.10.0'" build.gradle
