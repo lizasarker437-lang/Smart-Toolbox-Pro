@@ -20,13 +20,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Prepare Android project (ZIP or source files)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f app/build.gradle ]; then
+            project_dir=.
+          elif [ -f SmartToolboxPro/app/build.gradle ]; then
+            project_dir=SmartToolboxPro
+          elif [ -f SmartToolboxPro_GitHub.zip ]; then
+            mkdir -p source
+            unzip -q -o SmartToolboxPro_GitHub.zip -d source
+            project_dir=source/SmartToolboxPro
+          else
+            echo 'Android source project or SmartToolboxPro_GitHub.zip was not found.'
+            exit 1
+          fi
+          test -f "$project_dir/app/build.gradle"
+          echo "PROJECT_DIR=$project_dir" >> "$GITHUB_ENV"
+          echo "Building project in: $project_dir"
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      # v4 + explicit packages avoids requesting the removed SDK package "tools".
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
@@ -35,39 +54,174 @@ jobs:
       - name: Install Android platform and build tools
         run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Verify uploaded source archive
-        run: |
-          if [ ! -s "SmartToolboxPro_GitHub.zip" ]; then
-            echo "::error::SmartToolboxPro_GitHub.zip was not found in the repository root."
-            exit 1
-          fi
-          unzip -t "SmartToolboxPro_GitHub.zip"
-
-      - name: Extract project
-        run: |
-          rm -rf source
-          mkdir -p source
-          unzip -q "SmartToolboxPro_GitHub.zip" -d source
-          test -f source/SmartToolboxPro/settings.gradle
-          test -f source/SmartToolboxPro/app/build.gradle
-          test -f source/SmartToolboxPro/app/src/main/AndroidManifest.xml
-
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.9'
 
+      - name: Test edge-swipe direction and same-side restore
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          mkdir -p build/edge-tests
+          javac -d build/edge-tests \
+            app/src/main/java/com/smarttoolbox/pro/EdgeSwipeLogic.java \
+            tests/com/smarttoolbox/pro/EdgeSwipeLogicTest.java
+          java -cp build/edge-tests com.smarttoolbox.pro.EdgeSwipeLogicTest
+
+      - name: Verify Android project files
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          test -f settings.gradle
+          test -f app/build.gradle
+          test -f app/src/main/AndroidManifest.xml
+
+      - name: Check Java source for known invalid WindowManager flag
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          if grep -R --line-number --fixed-strings 'FLAG_LAYOUT_NO_LIMIT,' app/src/main/java; then
+            echo 'Invalid WindowManager flag found. Use FLAG_LAYOUT_NO_LIMITS.'
+            exit 1
+          fi
+          grep -R --line-number --fixed-strings 'FLAG_LAYOUT_NO_LIMITS' app/src/main/java
+
+      - name: Verify utility services and requested controls
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          test -f app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          test -f app/src/main/java/com/smarttoolbox/pro/FloatingIconSettingsActivity.java
+          test -f app/src/main/java/com/smarttoolbox/pro/ThermalMonitorService.java
+          test -f app/src/main/java/com/smarttoolbox/pro/SystemAudioBoostService.java
+          grep -q 'android:name=".FloatingControlService"' app/src/main/AndroidManifest.xml
+          grep -q 'android:name=".FloatingIconSettingsActivity"' app/src/main/AndroidManifest.xml
+          grep -q 'android:name=".ThermalMonitorService"' app/src/main/AndroidManifest.xml
+          grep -q 'android:name=".SystemAudioBoostService"' app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.MODIFY_AUDIO_SETTINGS' app/src/main/AndroidManifest.xml
+          grep -q 'new LoudnessEnhancer(0)' app/src/main/java/com/smarttoolbox/pro/SystemAudioBoostService.java
+          grep -q 'new Equalizer(0, 0)' app/src/main/java/com/smarttoolbox/pro/SystemAudioBoostService.java
+          grep -q 'new BassBoost(0, 0)' app/src/main/java/com/smarttoolbox/pro/SystemAudioBoostService.java
+          grep -q 'new Virtualizer(0, 0)' app/src/main/java/com/smarttoolbox/pro/SystemAudioBoostService.java
+          grep -q 'ACTION_UPDATE_EQ' app/src/main/java/com/smarttoolbox/pro/SystemAudioBoostService.java
+          grep -q 'applyFiveBandEqualizer' app/src/main/java/com/smarttoolbox/pro/SystemAudioBoostService.java
+          grep -q 'Bass Boost' app/src/main/java/com/smarttoolbox/pro/VolumeBoosterActivity.java
+          grep -q 'Virtualizer / Spatial Effect' app/src/main/java/com/smarttoolbox/pro/VolumeBoosterActivity.java
+          grep -q 'PRESET_NAMES' app/src/main/java/com/smarttoolbox/pro/VolumeBoosterActivity.java
+          grep -q 'ACTION_MASTER_ON' app/src/main/java/com/smarttoolbox/pro/SystemAudioBoostService.java
+          grep -q 'ACTION_MASTER_OFF' app/src/main/java/com/smarttoolbox/pro/SystemAudioBoostService.java
+          grep -q 'thermal.battery' app/src/main/java/com/smarttoolbox/pro/ThermalMonitorService.java
+          grep -q 'floating.auto_hide_seconds' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'floating.edge.width' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          # Edge swipe gesture, same-side restore, and native media volume controls.
+          grep -q 'handleEdgeGesture' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'restoreBubbleFromEdge(true)' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'PANEL_IDLE_TIMEOUT_MS = 3000L' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'FLAG_WATCH_OUTSIDE_TOUCH' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'MotionEvent.ACTION_OUTSIDE' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'dismissPanelFromOutsideTouch' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          test -f app/src/main/java/com/smarttoolbox/pro/NotificationControlsActivity.java
+          grep -q 'NotificationControlsActivity' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
+          grep -q 'android:name=".NotificationControlsActivity"' app/src/main/AndroidManifest.xml
+          grep -q 'ACTION_CHANNEL_NOTIFICATION_SETTINGS' app/src/main/java/com/smarttoolbox/pro/NotificationControlsActivity.java
+          grep -q 'ACTION_APP_NOTIFICATION_SETTINGS' app/src/main/java/com/smarttoolbox/pro/NotificationControlsActivity.java
+          grep -q 'ACTION_ALL_APPS_NOTIFICATION_SETTINGS' app/src/main/java/com/smarttoolbox/pro/NotificationControlsActivity.java
+          grep -q 'POST_NOTIFICATIONS' app/src/main/java/com/smarttoolbox/pro/NotificationControlsActivity.java
+          grep -q 'EdgeSwipeLogic.isInwardSwipe' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'restoreBubbleFromEdge(true)' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addNativeMediaVolumeControls(masterCard)' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'AudioManager.ADJUST_RAISE' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'AudioManager.ADJUST_LOWER' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'AudioManager.STREAM_MUSIC' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          if grep -q 'android.permission.WRITE_SETTINGS' app/src/main/AndroidManifest.xml; then exit 1; fi
+          if grep -q 'Display brightness' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java; then exit 1; fi
+          grep -q 'floating.size' app/src/main/java/com/smarttoolbox/pro/FloatingIconSettingsActivity.java
+          grep -q 'addPanelFeatureHeaderTo(nightCard' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addPanelSliderTo(' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          # Prevent a regression of the missing listener/formatter compile error.
+          grep -q 'private interface PanelSliderFormatter' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'private interface PanelSliderListener' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'void onChange(int value)' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'void onRelease(int value)' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addPanelFeatureHeaderTo(thermalCard' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addPanelFeatureHeaderTo(masterCard' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addPanelActionTo(scannerCard' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'Close quick controls' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'schedulePanelAutoClose' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'cancelPanelAutoClose' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'panelAutoCloseRunnable' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          if grep -Eq 'Floating icon settings|Hide floating icon|Close panel' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java; then exit 1; fi
+          grep -q 'floating.size' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'floating.opacity' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addPanelSliderTo(' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'import android.os.Handler;' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'import android.os.Looper;' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'scheduleNightLevelUpdate' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'scheduleAudioGainUpdate' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'DimOverlayService.class' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'SystemAudioBoostService.ACTION_UPDATE' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'showEdgeHandleFromSavedPosition' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'restoreBubbleFromEdge' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'floating.auto_hide' app/src/main/java/com/smarttoolbox/pro/FloatingIconSettingsActivity.java
+          grep -q 'floating.auto_hidden' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'available (even when all tools are OFF)' app/src/main/java/com/smarttoolbox/pro/FloatingIconSettingsActivity.java
+          if grep -R --line-number 'setStreamVolume' app/src/main/java/com/smarttoolbox/pro/VolumeBoosterActivity.java; then
+            echo 'The system volume slider must not be changed by this app.'
+            exit 1
+          fi
+
+      - name: Verify requested feature updates
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          grep -q 'dimSeek.setMax(95)' app/src/main/java/com/smarttoolbox/pro/NightScreenActivity.java
+          grep -q 'LoudnessEnhancer' app/src/main/java/com/smarttoolbox/pro/SystemAudioBoostService.java
+          grep -q 'TYPE_APPLICATION_OVERLAY' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'FloatingIconSettingsActivity' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
+          grep -q 'FLAG_LAYOUT_NO_LIMITS' app/src/main/java/com/smarttoolbox/pro/DimOverlayService.java
+
+      - name: Verify Kotlin standard library alignment
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          gradle --no-daemon --console=plain :app:dependencyInsight --dependency kotlin-stdlib-jdk7 --configuration debugRuntimeClasspath
+          gradle --no-daemon --console=plain :app:dependencyInsight --dependency kotlin-stdlib-jdk8 --configuration debugRuntimeClasspath
+
+      - name: Check duplicate Android classes
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: gradle --no-daemon --stacktrace :app:checkDebugDuplicateClasses
+
       - name: Build debug APK
-        working-directory: source/SmartToolboxPro
-        run: gradle --no-daemon --stacktrace :app:assembleDebug
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --console=plain :app:assembleDebug 2>&1 | tee build-debug.log
+
+      - name: Print Java compiler errors (if build fails)
+        working-directory: ${{ env.PROJECT_DIR }}
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f build-debug.log ]; then
+            echo '=== Java compiler error locations ==='
+            grep -n -E '\.java:[0-9]+: error:|^error:|cannot find symbol|symbol:|location:' build-debug.log | head -n 100 || true
+            echo '=== Last 80 build log lines ==='
+            tail -n 80 build-debug.log
+          fi
+
+      - name: Save build log (if build fails)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartToolboxPro-build-errors
+          path: ${{ env.PROJECT_DIR }}/build-debug.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Verify APK was created
-        run: test -s source/SmartToolboxPro/app/build/outputs/apk/debug/app-debug.apk
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: SmartToolboxPro-debug-apk
-          path: source/SmartToolboxPro/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
