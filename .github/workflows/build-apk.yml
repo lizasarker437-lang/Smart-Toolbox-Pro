@@ -113,11 +113,41 @@ jobs:
             tests/com/smarttoolbox/pro/EdgeSwipeLogicTest.java
           java -cp build/edge-tests com.smarttoolbox.pro.EdgeSwipeLogicTest
 
+      - name: Verify integrated compact controls, colors and clipped toolbox
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/CompactFeatureBar.java"
+          test -f "$src/CompactControlMath.java"
+          grep -q 'setClipToOutline(true)' "$src/FloatingControlService.java"
+          grep -q 'setClipChildren(true)' "$src/FloatingControlService.java"
+          grep -q 'addCompactLevelControl("Night Screen"' "$src/FloatingControlService.java"
+          grep -q 'addCompactLevelControl("Volume Boost"' "$src/FloatingControlService.java"
+          grep -q 'addCompactToggleControl("Thermal"' "$src/FloatingControlService.java"
+          grep -q 'addNativeMediaVolumeControls(panelContent' "$src/FloatingControlService.java"
+          grep -q 'CompactControlMath.isHorizontalDrag' "$src/CompactFeatureBar.java"
+          grep -q 'CompactControlMath.levelFromTouch' "$src/CompactFeatureBar.java"
+          grep -q 'onToggle()' "$src/CompactFeatureBar.java"
+          grep -q 'ON_FILL' "$src/CompactFeatureBar.java"
+          grep -q 'panelHeight(' "$src/CompactControlMath.java"
+          if grep -q 'addPanelSliderTo(' "$src/FloatingControlService.java"; then
+            echo 'Old duplicated slider rows must not be rendered.'; exit 1
+          fi
+          mkdir -p build/compact-control-tests
+          javac -d build/compact-control-tests \
+            "$src/CompactControlMath.java" "$src/ToolboxPanelSize.java" \
+            tests/com/smarttoolbox/pro/CompactControlMathTest.java
+          java -cp build/compact-control-tests com.smarttoolbox.pro.CompactControlMathTest
+
       - name: Verify resizable floating toolbox panel and Java sizing tests
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
           src=app/src/main/java/com/smarttoolbox/pro
           test -f "$src/ToolboxPanelSize.java"
           grep -q 'floating.toolbox.width_dp' "$src/FloatingIconSettingsActivity.java"
@@ -138,7 +168,8 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
           main=app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
           grep -q 'WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE' "$main"
           grep -q 'controller.hide(WindowInsetsCompat.Type.systemBars())' "$main"
@@ -163,24 +194,56 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          set -euo pipefail
-          test -f app/src/main/java/com/smarttoolbox/pro/AboutDeveloperActivity.java
-          test -f app/src/main/res/drawable-nodpi/ic_launcher.png
-          grep -q 'SR Smart Toolbox Pro' app/src/main/res/values/strings.xml
-          grep -q 'Shahriar Rahman' app/src/main/java/com/smarttoolbox/pro/AboutDeveloperActivity.java
-          grep -q 'https://www.youtube.com/@SRCreation-farm' app/src/main/java/com/smarttoolbox/pro/AboutDeveloperActivity.java
-          grep -q 'https://fb.com/srcreation.farm' app/src/main/java/com/smarttoolbox/pro/AboutDeveloperActivity.java
-          grep -q 'AboutDeveloperActivity' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
-          grep -q 'android:name=".AboutDeveloperActivity"' app/src/main/AndroidManifest.xml
-          grep -q "applicationId 'com.smarttoolbox.pro'" app/build.gradle
-          grep -q 'versionCode 23' app/build.gradle
-          grep -q "versionName '1.4.8-alpha23'" app/build.gradle
+          set -Eeuo pipefail
+          echo '===== ACTUAL SOURCE FROM THE ZIP (not workflow file) ====='
+          pwd
+          if [ -f app/build.gradle ]; then
+            grep -E '^[[:space:]]*(applicationId|versionCode|versionName)[[:space:]]+' app/build.gradle || true
+          fi
+          echo '=========================================================='
+
+          fail() {
+            echo "::error title=Branding source verification::$1"
+            exit 1
+          }
+          require_file() {
+            [ -f "$1" ] || fail "Missing file: $1. Replace the repository's SmartToolboxPro_GitHub.zip with the matching source ZIP."
+            echo "OK file: $1"
+          }
+          require_text() {
+            local pattern="$1" file="$2" label="$3"
+            grep -Fq -- "$pattern" "$file" || fail "$label is missing in $file. Your source ZIP may be older than the workflow."
+            echo "OK: $label"
+          }
+
+          require_file 'app/src/main/java/com/smarttoolbox/pro/AboutDeveloperActivity.java'
+          require_file 'app/src/main/res/drawable-nodpi/ic_launcher.png'
+          require_file 'app/src/main/res/values/strings.xml'
+          require_file 'app/src/main/java/com/smarttoolbox/pro/MainActivity.java'
+          require_file 'app/src/main/AndroidManifest.xml'
+          require_file 'app/build.gradle'
+
+          require_text 'SR Smart Toolbox Pro' 'app/src/main/res/values/strings.xml' 'Branded application name'
+          require_text 'Shahriar Rahman' 'app/src/main/java/com/smarttoolbox/pro/AboutDeveloperActivity.java' 'Developer credit'
+          require_text 'https://www.youtube.com/@SRCreation-farm' 'app/src/main/java/com/smarttoolbox/pro/AboutDeveloperActivity.java' 'YouTube link'
+          require_text 'https://fb.com/srcreation.farm' 'app/src/main/java/com/smarttoolbox/pro/AboutDeveloperActivity.java' 'Facebook link'
+          require_text 'AboutDeveloperActivity' 'app/src/main/java/com/smarttoolbox/pro/MainActivity.java' 'About navigation'
+          require_text 'android:name=".AboutDeveloperActivity"' 'app/src/main/AndroidManifest.xml' 'About activity registration'
+          require_text "applicationId 'com.smarttoolbox.pro'" 'app/build.gradle' 'App identity'
+
+          # Version metadata must be valid, but MUST NOT be hard-coded in the workflow.
+          # Hard-coded alpha/versionCode values previously caused false CI failures
+          # when the ZIP and workflow were uploaded separately from a mobile phone.
+          grep -Eq '^[[:space:]]*versionCode[[:space:]]+[0-9]+' app/build.gradle || fail 'Invalid/missing versionCode in app/build.gradle'
+          grep -Eq "^[[:space:]]*versionName[[:space:]]+['\"][^'\"]+['\"]" app/build.gradle || fail 'Invalid/missing versionName in app/build.gradle'
+          echo 'Branding verification passed against the actual Android source.'
 
       - name: Verify smart three-dot menu and home navigation
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
           main=app/src/main/java/com/smarttoolbox/pro/MainActivity.java
           grep -q 'new PopupMenu(this, anchor)' "$main"
           grep -q 'showOverflowMenu(overflow)' "$main"
@@ -207,7 +270,8 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
           java_dir=app/src/main/java/com/smarttoolbox/pro
           test -f "$java_dir/ThemePalette.java"
           test -f "$java_dir/ThemeManager.java"
@@ -237,8 +301,7 @@ jobs:
           grep -q 'showVideoOptions' "$java_dir/VideoLibraryActivity.java"
           grep -q 'continueButton' "$java_dir/VideoLibraryActivity.java"
           grep -q 'thumbnails.load(holder.thumbnail' "$java_dir/VideoLibraryActivity.java"
-          grep -q 'versionCode 23' app/build.gradle
-          grep -q "versionName '1.4.8-alpha23'" app/build.gradle
+          # Version is validated once in the branding step, without pinning a release number.
           mkdir -p build/theme-folder-tests
           javac -d build/theme-folder-tests \
             "$java_dir/ThemePalette.java" \
@@ -252,7 +315,8 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
           mkdir -p build/java-syntax-tests
           javac -d build/java-syntax-tests \
             tests/com/smarttoolbox/pro/JavaSourceSyntaxTest.java
@@ -263,7 +327,8 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
           mkdir -p build/library-fields-tests
           javac -d build/library-fields-tests \
             tests/com/smarttoolbox/pro/VideoLibrarySourceFieldsTest.java
@@ -284,6 +349,8 @@ jobs:
       - name: Verify Android project files
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
           test -f settings.gradle
           test -f app/build.gradle
           test -f app/src/main/AndroidManifest.xml
@@ -291,6 +358,8 @@ jobs:
       - name: Check Java source for known invalid WindowManager flag
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
           if grep -R --line-number --fixed-strings 'FLAG_LAYOUT_NO_LIMIT,' app/src/main/java; then
             echo 'Invalid WindowManager flag found. Use FLAG_LAYOUT_NO_LIMITS.'
             exit 1
@@ -300,6 +369,8 @@ jobs:
       - name: Verify utility services and requested controls
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
           test -f app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           test -f app/src/main/java/com/smarttoolbox/pro/FloatingIconSettingsActivity.java
           test -f app/src/main/java/com/smarttoolbox/pro/ThermalMonitorService.java
@@ -342,23 +413,17 @@ jobs:
           grep -q 'POST_NOTIFICATIONS' app/src/main/java/com/smarttoolbox/pro/NotificationControlsActivity.java
           grep -q 'EdgeSwipeLogic.isInwardSwipe' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           grep -q 'restoreBubbleFromEdge(true)' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
-          grep -q 'addNativeMediaVolumeControls(masterCard)' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addNativeMediaVolumeControls(panelContent' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           grep -q 'AudioManager.ADJUST_RAISE' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           grep -q 'AudioManager.ADJUST_LOWER' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           grep -q 'AudioManager.STREAM_MUSIC' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           if grep -q 'android.permission.WRITE_SETTINGS' app/src/main/AndroidManifest.xml; then exit 1; fi
           if grep -q 'Display brightness' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java; then exit 1; fi
           grep -q 'floating.size' app/src/main/java/com/smarttoolbox/pro/FloatingIconSettingsActivity.java
-          grep -q 'addPanelFeatureHeaderTo(nightCard' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
-          grep -q 'addPanelSliderTo(' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
-          # Prevent a regression of the missing listener/formatter compile error.
-          grep -q 'private interface PanelSliderFormatter' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
-          grep -q 'private interface PanelSliderListener' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
-          grep -q 'void onChange(int value)' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
-          grep -q 'void onRelease(int value)' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
-          grep -q 'addPanelFeatureHeaderTo(thermalCard' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
-          grep -q 'addPanelFeatureHeaderTo(masterCard' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
-          grep -q 'addPanelActionTo(scannerCard' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addCompactLevelControl(' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addCompactToggleControl(' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addCompactActionToPanel(' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          # CompactFeatureBar.Listener replaces the old nested slider callback interfaces.
           grep -q 'BarcodeScannerActivity.class' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
           grep -q 'GmsBarcodeScanning.getClient' app/src/main/java/com/smarttoolbox/pro/BarcodeScannerActivity.java
           grep -q 'enableAutoZoom' app/src/main/java/com/smarttoolbox/pro/BarcodeScannerActivity.java
@@ -373,7 +438,9 @@ jobs:
           if grep -Eq 'Floating icon settings|Hide floating icon|Close panel' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java; then exit 1; fi
           grep -q 'floating.size' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           grep -q 'floating.opacity' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
-          grep -q 'addPanelSliderTo(' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addCompactLevelControl(' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addCompactToggleControl(' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
+          grep -q 'addCompactActionToPanel(' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           grep -q 'import android.os.Handler;' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           grep -q 'import android.os.Looper;' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           grep -q 'scheduleNightLevelUpdate' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
@@ -394,7 +461,8 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
           test -f app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
           test -f app/src/main/java/com/smarttoolbox/pro/VideoPlaybackService.java
           test -f app/src/main/java/com/smarttoolbox/pro/VideoPlayerLogic.java
@@ -448,7 +516,8 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
           test -f app/src/main/java/com/smarttoolbox/pro/VideoLibraryActivity.java
           test -f app/src/main/java/com/smarttoolbox/pro/VideoResumeStore.java
           test -f app/src/main/java/com/smarttoolbox/pro/VideoResumeLogic.java
@@ -471,6 +540,8 @@ jobs:
       - name: Verify requested feature updates
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Source check failed::Failed check (line $LINENO): $BASH_COMMAND [exit $code]"; exit $code' ERR
           grep -q 'dimSeek.setMax(95)' app/src/main/java/com/smarttoolbox/pro/NightScreenActivity.java
           grep -q 'LoudnessEnhancer' app/src/main/java/com/smarttoolbox/pro/SystemAudioBoostService.java
           grep -q 'TYPE_APPLICATION_OVERLAY' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
