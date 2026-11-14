@@ -127,8 +127,8 @@ jobs:
           grep -q 'AboutDeveloperActivity' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
           grep -q 'android:name=".AboutDeveloperActivity"' app/src/main/AndroidManifest.xml
           grep -q "applicationId 'com.smarttoolbox.pro'" app/build.gradle
-          grep -q 'versionCode 16' app/build.gradle
-          grep -q "versionName '1.4.1-alpha16'" app/build.gradle
+          grep -q 'versionCode 17' app/build.gradle
+          grep -q "versionName '1.4.2-alpha17'" app/build.gradle
 
       - name: Verify Android project files
         working-directory: ${{ env.PROJECT_DIR }}
@@ -259,7 +259,7 @@ jobs:
           grep -q 'android:foregroundServiceType="mediaPlayback"' app/src/main/AndroidManifest.xml
           grep -q 'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK' app/src/main/AndroidManifest.xml
           grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
-          grep -q 'VideoPlayerActivity.class' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
+          grep -q 'VideoLibraryActivity.class' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
           grep -q 'openVideoPlayer' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           grep -q 'setSubtitleConfigurations' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
           grep -q 'TrackSelectionOverride' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
@@ -289,6 +289,30 @@ jobs:
             app/src/main/java/com/smarttoolbox/pro/VideoPlayerLogic.java \
             tests/com/smarttoolbox/pro/VideoPlayerLogicTest.java
           java -cp build/video-player-tests com.smarttoolbox.pro.VideoPlayerLogicTest
+
+      - name: Verify phone video library and independent resume tests
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app/src/main/java/com/smarttoolbox/pro/VideoLibraryActivity.java
+          test -f app/src/main/java/com/smarttoolbox/pro/VideoResumeStore.java
+          test -f app/src/main/java/com/smarttoolbox/pro/VideoResumeLogic.java
+          test -f tests/com/smarttoolbox/pro/VideoResumeLogicTest.java
+          grep -q 'android:name=".VideoLibraryActivity"' app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.READ_MEDIA_VIDEO' app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.READ_MEDIA_VISUAL_USER_SELECTED' app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.READ_EXTERNAL_STORAGE' app/src/main/AndroidManifest.xml
+          grep -q 'MediaStore.Video.Media.getContentUri' app/src/main/java/com/smarttoolbox/pro/VideoLibraryActivity.java
+          grep -q 'VideoResumeStore.get' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'VideoResumeStore.put' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          grep -q 'EXTRA_VIDEO_URI' app/src/main/java/com/smarttoolbox/pro/VideoLibraryActivity.java
+          grep -q 'EXTRA_RESTART_VIDEO' app/src/main/java/com/smarttoolbox/pro/VideoPlayerActivity.java
+          mkdir -p build/video-resume-tests
+          javac -d build/video-resume-tests \
+            app/src/main/java/com/smarttoolbox/pro/VideoResumeLogic.java \
+            tests/com/smarttoolbox/pro/VideoResumeLogicTest.java
+          java -cp build/video-resume-tests com.smarttoolbox.pro.VideoResumeLogicTest
 
       - name: Verify requested feature updates
         working-directory: ${{ env.PROJECT_DIR }}
