@@ -127,8 +127,66 @@ jobs:
           grep -q 'AboutDeveloperActivity' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
           grep -q 'android:name=".AboutDeveloperActivity"' app/src/main/AndroidManifest.xml
           grep -q "applicationId 'com.smarttoolbox.pro'" app/build.gradle
-          grep -q 'versionCode 17' app/build.gradle
-          grep -q "versionName '1.4.2-alpha17'" app/build.gradle
+          grep -q 'versionCode 19' app/build.gradle
+          grep -q "versionName '1.4.4-alpha19'" app/build.gradle
+
+      - name: Verify smart three-dot menu and home navigation
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          main=app/src/main/java/com/smarttoolbox/pro/MainActivity.java
+          grep -q 'new PopupMenu(this, anchor)' "$main"
+          grep -q 'showOverflowMenu(overflow)' "$main"
+          grep -q 'MENU_FLOATING_SETTINGS' "$main"
+          grep -q 'MENU_NOTIFICATION_CONTROLS' "$main"
+          grep -q 'MENU_ANDROID_APP_SETTINGS' "$main"
+          grep -q 'MENU_ABOUT_DEVELOPER' "$main"
+          grep -q 'MENU_THEME_SETTINGS' "$main"
+          grep -q 'ThemeSettingsActivity.class' "$main"
+          grep -q 'FloatingIconSettingsActivity.class' "$main"
+          grep -q 'NotificationControlsActivity.class' "$main"
+          grep -q 'AboutDeveloperActivity.class' "$main"
+          grep -q 'Settings.ACTION_APPLICATION_DETAILS_SETTINGS' "$main"
+          grep -q 'VideoLibraryActivity.class' "$main"
+          grep -q 'NightScreenActivity.class' "$main"
+          grep -q 'VolumeBoosterActivity.class' "$main"
+          grep -q 'ThermalMonitorActivity.class' "$main"
+          grep -q 'BarcodeScannerActivity.class' "$main"
+          if grep -q 'Ui.addCard(this, body, brandCard' "$main"; then exit 1; fi
+          if grep -q 'Ui.addCard(this, body, floatingCard' "$main"; then exit 1; fi
+          if grep -q 'Ui.addCard(this, body, notificationCard' "$main"; then exit 1; fi
+
+      - name: Verify themes and folder-first video browser
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          java_dir=app/src/main/java/com/smarttoolbox/pro
+          test -f "$java_dir/ThemePalette.java"
+          test -f "$java_dir/ThemeManager.java"
+          test -f "$java_dir/ThemeSettingsActivity.java"
+          test -f "$java_dir/VideoFolderLogic.java"
+          grep -q 'android:name=".SrToolboxApp"' app/src/main/AndroidManifest.xml
+          grep -q 'android:name=".ThemeSettingsActivity"' app/src/main/AndroidManifest.xml
+          grep -q 'AppThemeLight' app/src/main/res/values/styles.xml
+          grep -q 'ThemeManager.applyToActivity' "$java_dir/MainActivity.java"
+          grep -q 'ThemeManager.save' "$java_dir/ThemeSettingsActivity.java"
+          grep -q 'VideoFolderLogic.displayName' "$java_dir/VideoLibraryActivity.java"
+          grep -q 'new GridView(this)' "$java_dir/VideoLibraryActivity.java"
+          grep -q 'new ListView(this)' "$java_dir/VideoLibraryActivity.java"
+          grep -q 'MODE_CONTINUE' "$java_dir/VideoLibraryActivity.java"
+          grep -q 'VideoResumeStore.get' "$java_dir/VideoLibraryActivity.java"
+          grep -q 'versionCode 19' app/build.gradle
+          grep -q "versionName '1.4.4-alpha19'" app/build.gradle
+          mkdir -p build/theme-folder-tests
+          javac -d build/theme-folder-tests \
+            "$java_dir/ThemePalette.java" \
+            "$java_dir/VideoFolderLogic.java" \
+            tests/com/smarttoolbox/pro/ThemePaletteTest.java \
+            tests/com/smarttoolbox/pro/VideoFolderLogicTest.java
+          java -cp build/theme-folder-tests com.smarttoolbox.pro.ThemePaletteTest
+          java -cp build/theme-folder-tests com.smarttoolbox.pro.VideoFolderLogicTest
 
       - name: Verify Android project files
         working-directory: ${{ env.PROJECT_DIR }}
