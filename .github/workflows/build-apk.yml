@@ -649,8 +649,16 @@ jobs:
           grep -Fq 'MODE_SINGLE' "$src/MessageSchedulerActivity.java"
           grep -Fq 'MODE_GROUP' "$src/MessageSchedulerActivity.java"
           grep -Fq 'MessageScheduleStore.Item.createBatch' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'Group name (Broadcast label)' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'item.groupName' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'obj.put("groupName"' "$src/MessageScheduleStore.java"
+          grep -Fq 'reuseHistoryItem' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'queuedBatchItems.addLast(item)' "$src/ScheduledWhatsAppAccessibilityService.java"
+          grep -Fq 'startAutomation(next, true)' "$src/ScheduledWhatsAppAccessibilityService.java"
+          test -f "$src/GroupQueueLogic.java"
+          test -f tests/com/smarttoolbox/pro/GroupQueueLogicTest.java
           grep -Fq 'batchId' "$src/MessageScheduleStore.java"
-          grep -Fq 'static final long RECIPIENT_INTERVAL_MS' "$src/GroupScheduleLogic.java"
+          grep -Fq 'return baseMillis;' "$src/GroupScheduleLogic.java"
           grep -Fq 'new PopupMenu(this, anchor)' "$src/MessageSchedulerActivity.java"
           grep -Fq 'EXTRA_SETTINGS_ONLY' "$src/MessageSchedulerActivity.java"
           grep -Fq 'buildAutomationCard(body)' "$src/MessageSchedulerActivity.java"
@@ -668,14 +676,17 @@ jobs:
             "$src/RecipientSelectionLogic.java" \
             "$src/SchedulerTemplateLogic.java" \
             "$src/GroupScheduleLogic.java" \
+            "$src/GroupQueueLogic.java" \
             tests/com/smarttoolbox/pro/SchedulerDisplayLogicTest.java \
             tests/com/smarttoolbox/pro/RecipientSelectionLogicTest.java \
             tests/com/smarttoolbox/pro/SchedulerTemplateLogicTest.java \
-            tests/com/smarttoolbox/pro/GroupScheduleLogicTest.java
+            tests/com/smarttoolbox/pro/GroupScheduleLogicTest.java \
+            tests/com/smarttoolbox/pro/GroupQueueLogicTest.java
           java -cp build/scheduler-ui-tests com.smarttoolbox.pro.SchedulerDisplayLogicTest
           java -cp build/scheduler-ui-tests com.smarttoolbox.pro.RecipientSelectionLogicTest
           java -cp build/scheduler-ui-tests com.smarttoolbox.pro.SchedulerTemplateLogicTest
           java -cp build/scheduler-ui-tests com.smarttoolbox.pro.GroupScheduleLogicTest
+          java -cp build/scheduler-ui-tests com.smarttoolbox.pro.GroupQueueLogicTest
 
       - name: Verify foreground return and visible 3-2-1 send countdown
         working-directory: ${{ env.PROJECT_DIR }}
