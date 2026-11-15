@@ -548,6 +548,121 @@ jobs:
           grep -q 'FloatingIconSettingsActivity' app/src/main/java/com/smarttoolbox/pro/MainActivity.java
           grep -q 'FLAG_LAYOUT_NO_LIMITS' app/src/main/java/com/smarttoolbox/pro/DimOverlayService.java
 
+      - name: Verify WhatsApp Smart Scheduler and reminder logic
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=WhatsApp scheduler check failed::Failed at line $LINENO: $BASH_COMMAND [exit $code]"; exit $code' ERR
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/MessageSchedulerActivity.java"
+          test -f "$src/MessageScheduleStore.java"
+          test -f "$src/MessageScheduleReceiver.java"
+          test -f "$src/MessageScheduleBootReceiver.java"
+          test -f "$src/MessageScheduleLogic.java"
+          test -f tests/com/smarttoolbox/pro/MessageScheduleLogicTest.java
+          grep -q 'MessageSchedulerActivity.class' "$src/MainActivity.java"
+          grep -q 'MENU_MESSAGE_SCHEDULER' "$src/MainActivity.java"
+          grep -q 'android:name=".MessageSchedulerActivity"' app/src/main/AndroidManifest.xml
+          grep -q 'android:name=".MessageScheduleReceiver"' app/src/main/AndroidManifest.xml
+          grep -q 'android:name=".MessageScheduleBootReceiver"' app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.SCHEDULE_EXACT_ALARM' app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.RECEIVE_BOOT_COMPLETED' app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.POST_NOTIFICATIONS' app/src/main/AndroidManifest.xml
+          grep -q 'setExactAndAllowWhileIdle' "$src/MessageScheduleStore.java"
+          grep -q 'setAndAllowWhileIdle' "$src/MessageScheduleStore.java"
+          grep -q 'rescheduleAll' "$src/MessageScheduleBootReceiver.java"
+          grep -q 'Intent.ACTION_VIEW' "$src/MessageScheduleReceiver.java"
+          grep -q 'https://wa.me/' "$src/MessageScheduleLogic.java"
+          grep -q 'RecognizerIntent.ACTION_RECOGNIZE_SPEECH' "$src/MessageSchedulerActivity.java"
+          grep -q 'ContactsContract.CommonDataKinds.Phone.CONTENT_URI' "$src/MessageSchedulerActivity.java"
+          grep -q '"daily"' "$src/MessageScheduleLogic.java"
+          grep -q '"weekly"' "$src/MessageScheduleLogic.java"
+          grep -q 'sr_whatsapp_schedule' "$src/NotificationControlsActivity.java"
+          # Explicit opt-in, official WhatsApp app only, encrypted PIN, and manual fallback.
+          test -f "$src/ScheduledWhatsAppAccessibilityService.java"
+          test -f "$src/SecurePinVault.java"
+          test -f "$src/AutoSendPreferences.java"
+          test -f "$src/AutomationRules.java"
+          test -f tests/com/smarttoolbox/pro/AutomationRulesTest.java
+          test -f app/src/main/res/xml/scheduler_accessibility.xml
+          grep -q 'ScheduledWhatsAppAccessibilityService' app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.BIND_ACCESSIBILITY_SERVICE' app/src/main/AndroidManifest.xml
+          grep -q 'android:canPerformGestures="true"' app/src/main/res/xml/scheduler_accessibility.xml
+          grep -q 'android:allowBackup="false"' app/src/main/AndroidManifest.xml
+          grep -q 'AndroidKeyStore' "$src/SecurePinVault.java"
+          grep -q 'AES/GCM/NoPadding' "$src/SecurePinVault.java"
+          grep -q 'setEnabled(Context c, boolean enabled)' "$src/AutoSendPreferences.java"
+          grep -q 'MessageScheduleReceiver.showReminder' "$src/ScheduledWhatsAppAccessibilityService.java"
+          grep -q 'com.whatsapp' "$src/AutomationRules.java"
+          grep -q 'GLOBAL_ACTION_LOCK_SCREEN' "$src/ScheduledWhatsAppAccessibilityService.java"
+          grep -q 'EXTRA_PRE_ALERT' "$src/MessageScheduleReceiver.java"
+          grep -q 'EXTRA_EXPECTED_DUE' "$src/MessageScheduleReceiver.java"
+          mkdir -p build/scheduler-automation-tests
+          javac -d build/scheduler-automation-tests \
+            "$src/AutomationRules.java" \
+            tests/com/smarttoolbox/pro/AutomationRulesTest.java
+          java -cp build/scheduler-automation-tests com.smarttoolbox.pro.AutomationRulesTest
+          mkdir -p build/message-scheduler-tests
+          javac -d build/message-scheduler-tests \
+            "$src/MessageScheduleLogic.java" \
+            tests/com/smarttoolbox/pro/MessageScheduleLogicTest.java
+          java -cp build/message-scheduler-tests com.smarttoolbox.pro.MessageScheduleLogicTest
+
+      - name: Verify scheduler overflow menu, recipient history, templates and timers
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Scheduler UI verification::Failed line $LINENO: $BASH_COMMAND [exit $code]"; exit $code' ERR
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/SchedulerDisplayLogic.java"
+          test -f "$src/SchedulerRecipientHistory.java"
+          test -f "$src/RecipientSelectionLogic.java"
+          test -f tests/com/smarttoolbox/pro/SchedulerDisplayLogicTest.java
+          test -f tests/com/smarttoolbox/pro/RecipientSelectionLogicTest.java
+          grep -Fq 'new PopupMenu(this, anchor)' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'EXTRA_SETTINGS_ONLY' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'buildAutomationCard(body)' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'SchedulerRecipientHistory.record' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'SchedulerRecipientHistory.remove' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'RecipientSelectionLogic.appendUnique' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'SchedulerDisplayLogic.tenSecondTrigger' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'AutoSendPreferences.enabled(this)' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'SchedulerDisplayLogic.remainingLabel' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'countdownHandler.postDelayed(this, 1000L)' "$src/MessageSchedulerActivity.java"
+          mkdir -p build/scheduler-ui-tests
+          javac -encoding UTF-8 -d build/scheduler-ui-tests \
+            "$src/MessageScheduleLogic.java" \
+            "$src/SchedulerDisplayLogic.java" \
+            "$src/RecipientSelectionLogic.java" \
+            tests/com/smarttoolbox/pro/SchedulerDisplayLogicTest.java \
+            tests/com/smarttoolbox/pro/RecipientSelectionLogicTest.java
+          java -cp build/scheduler-ui-tests com.smarttoolbox.pro.SchedulerDisplayLogicTest
+          java -cp build/scheduler-ui-tests com.smarttoolbox.pro.RecipientSelectionLogicTest
+
+      - name: Verify foreground return and visible 3-2-1 send countdown
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Foreground automation::Failed line $LINENO: $BASH_COMMAND [exit $code]"; exit $code' ERR
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/SchedulerForegroundLogic.java"
+          test -f tests/com/smarttoolbox/pro/SchedulerForegroundLogicTest.java
+          grep -Fq 'SchedulerForegroundLogic.captureTarget' "$src/ScheduledWhatsAppAccessibilityService.java"
+          grep -Fq 'GLOBAL_ACTION_HOME' "$src/ScheduledWhatsAppAccessibilityService.java"
+          grep -Fq 'GLOBAL_ACTION_BACK' "$src/ScheduledWhatsAppAccessibilityService.java"
+          grep -Fq 'previewDeadlineElapsed' "$src/ScheduledWhatsAppAccessibilityService.java"
+          grep -Fq 'previewCountdownText.setText' "$src/ScheduledWhatsAppAccessibilityService.java"
+          grep -Fq 'SchedulerForegroundLogic.remainingMillis' "$src/ScheduledWhatsAppAccessibilityService.java"
+          grep -Fq '📤 মেসেজটি পাঠানোর বাকি সময়' "$src/MessageSchedulerActivity.java"
+          mkdir -p build/scheduler-foreground-tests
+          javac -encoding UTF-8 -d build/scheduler-foreground-tests \
+            "$src/SchedulerForegroundLogic.java" \
+            tests/com/smarttoolbox/pro/SchedulerForegroundLogicTest.java
+          java -cp build/scheduler-foreground-tests com.smarttoolbox.pro.SchedulerForegroundLogicTest
+
       - name: Verify Kotlin standard library alignment
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
