@@ -131,7 +131,8 @@ jobs:
           grep -q 'CompactControlMath.isHorizontalDrag' "$src/CompactFeatureBar.java"
           grep -q 'CompactControlMath.levelFromTouch' "$src/CompactFeatureBar.java"
           grep -q 'onToggle()' "$src/CompactFeatureBar.java"
-          grep -q 'ON_FILL' "$src/CompactFeatureBar.java"
+          grep -q 'Ui.GREEN' "$src/CompactFeatureBar.java"
+          grep -q 'Ui.ACCENT' "$src/CompactFeatureBar.java"
           grep -q 'panelHeight(' "$src/CompactControlMath.java"
           if grep -q 'addPanelSliderTo(' "$src/FloatingControlService.java"; then
             echo 'Old duplicated slider rows must not be rendered.'; exit 1
@@ -282,6 +283,17 @@ jobs:
           grep -q 'AppThemeLight' app/src/main/res/values/styles.xml
           grep -q 'ThemeManager.applyToActivity' "$java_dir/MainActivity.java"
           grep -q 'ThemeManager.save' "$java_dir/ThemeSettingsActivity.java"
+          grep -q 'ThemeManager.saveAppearance' "$java_dir/ThemeSettingsActivity.java"
+          grep -q 'ThemeManager.MODE_SYSTEM' "$java_dir/ThemeSettingsActivity.java"
+          grep -q 'ThemeManager.MODE_LIGHT' "$java_dir/ThemeSettingsActivity.java"
+          grep -q 'ThemeManager.MODE_DARK' "$java_dir/ThemeSettingsActivity.java"
+          grep -q 'ThemePalette.count()' "$java_dir/ThemeSettingsActivity.java"
+          grep -q 'static final String\[\] NAMES' "$java_dir/ThemePalette.java"
+          grep -q 'ThemeManager.styleKey' "$java_dir/MainActivity.java"
+          grep -q 'ThemeManager.initialize(this)' "$java_dir/FloatingControlService.java"
+          grep -q 'ThemeManager.isLight(this)' "$java_dir/FloatingControlService.java"
+          grep -q 'Ui.ACCENT' "$java_dir/FloatingControlService.java"
+          grep -q 'FloatingControlService.refresh(context)' "$java_dir/ThemeManager.java"
           grep -q 'VideoFolderLogic.displayName' "$java_dir/VideoLibraryActivity.java"
           grep -q 'new GridView(this)' "$java_dir/VideoLibraryActivity.java"
           grep -q 'new ListView(this)' "$java_dir/VideoLibraryActivity.java"
@@ -619,8 +631,25 @@ jobs:
           test -f "$src/SchedulerDisplayLogic.java"
           test -f "$src/SchedulerRecipientHistory.java"
           test -f "$src/RecipientSelectionLogic.java"
+          test -f "$src/SchedulerTemplateStore.java"
+          test -f "$src/SchedulerTemplateLogic.java"
+          test -f "$src/GroupScheduleLogic.java"
           test -f tests/com/smarttoolbox/pro/SchedulerDisplayLogicTest.java
           test -f tests/com/smarttoolbox/pro/RecipientSelectionLogicTest.java
+          test -f tests/com/smarttoolbox/pro/SchedulerTemplateLogicTest.java
+          test -f tests/com/smarttoolbox/pro/GroupScheduleLogicTest.java
+          grep -q 'android.permission.READ_CONTACTS' app/src/main/AndroidManifest.xml
+          grep -Fq 'MENU_MANAGE_TEMPLATES' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'showTemplateManager()' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'SchedulerTemplateStore.add' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'SchedulerTemplateStore.update' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'SchedulerTemplateStore.delete' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'setMultiChoiceItems' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'MODE_SINGLE' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'MODE_GROUP' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'MessageScheduleStore.Item.createBatch' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'batchId' "$src/MessageScheduleStore.java"
+          grep -Fq 'static final long RECIPIENT_INTERVAL_MS' "$src/GroupScheduleLogic.java"
           grep -Fq 'new PopupMenu(this, anchor)' "$src/MessageSchedulerActivity.java"
           grep -Fq 'EXTRA_SETTINGS_ONLY' "$src/MessageSchedulerActivity.java"
           grep -Fq 'buildAutomationCard(body)' "$src/MessageSchedulerActivity.java"
@@ -636,10 +665,16 @@ jobs:
             "$src/MessageScheduleLogic.java" \
             "$src/SchedulerDisplayLogic.java" \
             "$src/RecipientSelectionLogic.java" \
+            "$src/SchedulerTemplateLogic.java" \
+            "$src/GroupScheduleLogic.java" \
             tests/com/smarttoolbox/pro/SchedulerDisplayLogicTest.java \
-            tests/com/smarttoolbox/pro/RecipientSelectionLogicTest.java
+            tests/com/smarttoolbox/pro/RecipientSelectionLogicTest.java \
+            tests/com/smarttoolbox/pro/SchedulerTemplateLogicTest.java \
+            tests/com/smarttoolbox/pro/GroupScheduleLogicTest.java
           java -cp build/scheduler-ui-tests com.smarttoolbox.pro.SchedulerDisplayLogicTest
           java -cp build/scheduler-ui-tests com.smarttoolbox.pro.RecipientSelectionLogicTest
+          java -cp build/scheduler-ui-tests com.smarttoolbox.pro.SchedulerTemplateLogicTest
+          java -cp build/scheduler-ui-tests com.smarttoolbox.pro.GroupScheduleLogicTest
 
       - name: Verify foreground return and visible 3-2-1 send countdown
         working-directory: ${{ env.PROJECT_DIR }}
