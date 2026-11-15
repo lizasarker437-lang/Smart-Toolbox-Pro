@@ -621,6 +621,26 @@ jobs:
             tests/com/smarttoolbox/pro/MessageScheduleLogicTest.java
           java -cp build/message-scheduler-tests com.smarttoolbox.pro.MessageScheduleLogicTest
 
+      - name: Verify collapsible scheduler inbox sections and local-date grouping
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Scheduler inbox::Failed line $LINENO: $BASH_COMMAND [exit $code]"; exit $code' ERR
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/SchedulerSectionLogic.java"
+          test -f tests/com/smarttoolbox/pro/SchedulerSectionLogicTest.java
+          grep -Fq 'SchedulerSectionLogic.sectionFor(' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'addScheduleSection(key, sectionItems)' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'putBoolean("section_" + key, !expanded)' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'sectionSignature(latest, now, ZoneId.systemDefault())' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'SchedulerDisplayLogic.remainingLabel' "$src/MessageSchedulerActivity.java"
+          mkdir -p build/scheduler-section-tests
+          javac -encoding UTF-8 -d build/scheduler-section-tests \
+            "$src/SchedulerSectionLogic.java" \
+            tests/com/smarttoolbox/pro/SchedulerSectionLogicTest.java
+          java -cp build/scheduler-section-tests com.smarttoolbox.pro.SchedulerSectionLogicTest
+
       - name: Verify scheduler overflow menu, recipient history, templates and timers
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
