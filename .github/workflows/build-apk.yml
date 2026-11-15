@@ -634,6 +634,7 @@ jobs:
           test -f "$src/SchedulerTemplateStore.java"
           test -f "$src/SchedulerTemplateLogic.java"
           test -f "$src/GroupScheduleLogic.java"
+          grep -Fq 'static String messagePreview(String message, int maxChars)' "$src/SchedulerDisplayLogic.java"
           test -f tests/com/smarttoolbox/pro/SchedulerDisplayLogicTest.java
           test -f tests/com/smarttoolbox/pro/RecipientSelectionLogicTest.java
           test -f tests/com/smarttoolbox/pro/SchedulerTemplateLogicTest.java
