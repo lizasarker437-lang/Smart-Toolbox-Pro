@@ -740,6 +740,60 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: gradle --no-daemon --stacktrace :app:checkDebugDuplicateClasses
 
+      - name: Verify scheduler notepad and portrait video edge
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/SchedulerNotepadActivity.java"
+          test -f "$src/SchedulerNoteStore.java"
+          test -f "$src/SchedulerNoteLogic.java"
+          test -f "$src/VideoPlaybackEdgeBridge.java"
+          test -f "$src/PortraitVideoEdgeLogic.java"
+          grep -Fq 'android:name=".SchedulerNotepadActivity" android:exported="false"' app/src/main/AndroidManifest.xml
+          grep -Fq 'SchedulerNotepadActivity.EXTRA_NOTE_BODY' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'MENU_NOTEPAD' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'openSchedulerNotepad()' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'SchedulerNoteStore.save(this' "$src/SchedulerNotepadActivity.java"
+          grep -Fq 'SchedulerNoteStore.delete(this' "$src/SchedulerNotepadActivity.java"
+          grep -Fq 'ACTION_SR_VIDEO_EDGE_START' "$src/FloatingControlService.java"
+          grep -Fq 'srMoveBubbleToPortraitVideoEdge()' "$src/FloatingControlService.java"
+          grep -Fq 'srRestoreBubbleAfterPortraitVideo()' "$src/FloatingControlService.java"
+          grep -Fq 'floating.portrait_video.edge' "$src/FloatingIconSettingsActivity.java"
+          grep -Fq 'syncPortraitVideoEdge()' "$src/VideoPlayerActivity.java"
+          grep -Fq 'VideoPlaybackEdgeBridge.onPlaying(this)' "$src/VideoPlayerActivity.java"
+          grep -Fq 'VideoPlaybackEdgeBridge.onStopped(this)' "$src/VideoPlayerActivity.java"
+          mkdir -p build/notes-edge-tests
+          javac -encoding UTF-8 -d build/notes-edge-tests \
+            "$src/SchedulerNoteLogic.java" \
+            "$src/PortraitVideoEdgeLogic.java" \
+            tests/com/smarttoolbox/pro/UpdateKitLogicTest.java
+          java -cp build/notes-edge-tests com.smarttoolbox.pro.UpdateKitLogicTest
+
+      - name: Verify system-wide Portrait Edge in every app
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/GlobalPortraitEdgeLogic.java"
+          test -f tests/com/smarttoolbox/pro/GlobalPortraitEdgeLogicTest.java
+          grep -Fq 'floating.portrait_anywhere.edge' "$src/FloatingIconSettingsActivity.java"
+          grep -Fq 'Portrait Edge — ALL apps' "$src/FloatingIconSettingsActivity.java"
+          grep -Fq 'registerDisplayListener(portraitDisplayListener' "$src/FloatingControlService.java"
+          grep -Fq 'void onConfigurationChanged(Configuration newConfig)' "$src/FloatingControlService.java"
+          grep -Fq 'syncGlobalPortraitEdge()' "$src/FloatingControlService.java"
+          grep -Fq 'GlobalPortraitEdgeLogic.shouldDock' "$src/FloatingControlService.java"
+          grep -Fq 'GlobalPortraitEdgeLogic.shouldUndock' "$src/FloatingControlService.java"
+          grep -Fq 'GLOBAL_EDGE_MOVED' "$src/FloatingControlService.java"
+          grep -Fq 'srRestoreBubbleAfterPortraitVideo()' "$src/FloatingControlService.java"
+          mkdir -p build/global-portrait-tests
+          javac -encoding UTF-8 -d build/global-portrait-tests \
+            "$src/GlobalPortraitEdgeLogic.java" \
+            tests/com/smarttoolbox/pro/GlobalPortraitEdgeLogicTest.java
+          java -cp build/global-portrait-tests com.smarttoolbox.pro.GlobalPortraitEdgeLogicTest
+
       - name: Build debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
