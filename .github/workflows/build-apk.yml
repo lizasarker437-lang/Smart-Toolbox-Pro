@@ -429,7 +429,10 @@ jobs:
           grep -q 'AudioManager.ADJUST_RAISE' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           grep -q 'AudioManager.ADJUST_LOWER' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
           grep -q 'AudioManager.STREAM_MUSIC' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
-          if grep -q 'android.permission.WRITE_SETTINGS' app/src/main/AndroidManifest.xml; then exit 1; fi
+          # WRITE_SETTINGS is now explicitly user-authorized for optional minimum
+          # brightness. Verify its caller checks Settings.System.canWrite first.
+          grep -q 'android.permission.WRITE_SETTINGS' app/src/main/AndroidManifest.xml
+          grep -Fq 'Settings.System.canWrite(context)' app/src/main/java/com/smarttoolbox/pro/NightBrightnessController.java
           if grep -q 'Display brightness' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java; then exit 1; fi
           grep -q 'floating.size' app/src/main/java/com/smarttoolbox/pro/FloatingIconSettingsActivity.java
           grep -q 'addCompactLevelControl(' app/src/main/java/com/smarttoolbox/pro/FloatingControlService.java
@@ -548,6 +551,40 @@ jobs:
             app/src/main/java/com/smarttoolbox/pro/VideoResumeLogic.java \
             tests/com/smarttoolbox/pro/VideoResumeLogicTest.java
           java -cp build/video-resume-tests com.smarttoolbox.pro.VideoResumeLogicTest
+
+      - name: Verify minimum-brightness Night Screen and restore-safety regression
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Night Screen verification::Failed line $LINENO: $BASH_COMMAND [exit $code]"; exit $code' ERR
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/NightBrightnessController.java"
+          test -f "$src/NightBrightnessPolicy.java"
+          test -f tests/com/smarttoolbox/pro/NightBrightnessPolicyTest.java
+          grep -Fq 'Settings.ACTION_MANAGE_WRITE_SETTINGS' "$src/NightScreenActivity.java"
+          grep -Fq 'min_system_brightness' "$src/NightScreenActivity.java"
+          grep -Fq 'NightBrightnessController.applyMinimum(this)' "$src/DimOverlayService.java"
+          grep -Fq 'NightBrightnessController.restore(this)' "$src/DimOverlayService.java"
+          grep -Fq 'NightBrightnessPolicy.SAFE_OVERLAY_WINDOW_ALPHA' "$src/DimOverlayService.java"
+          grep -Fq 'Turn off & restore' "$src/DimOverlayService.java"
+          grep -Fq 'Settings.System.SCREEN_BRIGHTNESS_MODE' "$src/NightBrightnessController.java"
+          test "$(grep -c 'NightBrightnessController.restore(this)' "$src/DimOverlayService.java")" -ge 2
+          mkdir -p build/night-brightness-tests
+          javac -encoding UTF-8 -d build/night-brightness-tests \
+            "$src/NightBrightnessPolicy.java" \
+            tests/com/smarttoolbox/pro/NightBrightnessPolicyTest.java
+          java -cp build/night-brightness-tests com.smarttoolbox.pro.NightBrightnessPolicyTest
+          mkdir -p build/night-brightness-controller-tests
+          javac -encoding UTF-8 -d build/night-brightness-controller-tests \
+            tests/night-brightness-stubs/android/content/SharedPreferences.java \
+            tests/night-brightness-stubs/android/content/ContentResolver.java \
+            tests/night-brightness-stubs/android/content/Context.java \
+            tests/night-brightness-stubs/android/provider/Settings.java \
+            "$src/NightBrightnessPolicy.java" \
+            "$src/NightBrightnessController.java" \
+            tests/night-brightness-stubs/com/smarttoolbox/pro/NightBrightnessControllerTest.java
+          java -cp build/night-brightness-controller-tests com.smarttoolbox.pro.NightBrightnessControllerTest
 
       - name: Verify requested feature updates
         working-directory: ${{ env.PROJECT_DIR }}
