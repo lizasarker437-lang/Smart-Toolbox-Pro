@@ -740,6 +740,32 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: gradle --no-daemon --stacktrace :app:checkDebugDuplicateClasses
 
+      - name: Verify floating bar swipe opens controls in Home and other apps
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Floating swipe::Failed at line $LINENO: $BASH_COMMAND [exit $code]"; exit $code' ERR
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/FloatingBarGestureLogic.java"
+          test -f tests/com/smarttoolbox/pro/FloatingBarGestureLogicTest.java
+          grep -Fq 'FloatingBarGestureLogic.bubbleSwipe' "$src/FloatingControlService.java"
+          grep -Fq 'FloatingBarGestureLogic.edgeSwipe' "$src/FloatingControlService.java"
+          grep -Fq 'edgeHandle.performClick()' "$src/FloatingControlService.java"
+          grep -Fq 'revealQuickPanelFromEdge()' "$src/FloatingControlService.java"
+          grep -Fq 'gestureFallbackHandler.postDelayed' "$src/FloatingControlService.java"
+          grep -Fq 'int touchWidthDp = Math.max(44, edgeWidthDp)' "$src/FloatingControlService.java"
+          grep -Fq 'case MotionEvent.ACTION_UP:' "$src/FloatingControlService.java"
+          grep -Fq 'Portrait Edge — ALL apps' "$src/FloatingIconSettingsActivity.java"
+          mkdir -p build/floating-swipe-tests
+          javac -encoding UTF-8 -d build/floating-swipe-tests \
+            "$src/FloatingBarGestureLogic.java" \
+            "$src/EdgeSwipeLogic.java" \
+            tests/com/smarttoolbox/pro/FloatingBarGestureLogicTest.java \
+            tests/com/smarttoolbox/pro/EdgeSwipeLogicTest.java
+          java -cp build/floating-swipe-tests com.smarttoolbox.pro.FloatingBarGestureLogicTest
+          java -cp build/floating-swipe-tests com.smarttoolbox.pro.EdgeSwipeLogicTest
+
       - name: Verify scheduler notepad and portrait video edge
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
