@@ -777,6 +777,33 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: gradle --no-daemon --stacktrace :app:checkDebugDuplicateClasses
 
+      - name: Verify independent Tap Swipe and 2-second Hold-to-Move gestures
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Floating gesture modes::Failed at line $LINENO: $BASH_COMMAND [exit $code]"; exit $code' ERR
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/FloatingOpenModeLogic.java"
+          test -f tests/com/smarttoolbox/pro/FloatingOpenModeLogicTest.java
+          grep -Fq 'openOnTapSwitch' "$src/FloatingIconSettingsActivity.java"
+          grep -Fq 'openOnSwipeSwitch' "$src/FloatingIconSettingsActivity.java"
+          grep -Fq 'getBoolean(FloatingOpenModeLogic.PREF_TAP, true)' "$src/FloatingControlService.java"
+          grep -Fq 'getBoolean(FloatingOpenModeLogic.PREF_SWIPE, true)' "$src/FloatingControlService.java"
+          grep -Fq 'FloatingOpenModeLogic.startDrag(' "$src/FloatingControlService.java"
+          grep -Fq 'FloatingOpenModeLogic.shouldOpen(' "$src/FloatingControlService.java"
+          grep -Fq 'finishEdgeTabDrag()' "$src/FloatingControlService.java"
+          grep -Fq 'floatingTouchActive' "$src/FloatingControlService.java"
+          grep -Fq 'HOLD_TO_MOVE_MS = 2000L' "$src/FloatingOpenModeLogic.java"
+          mkdir -p build/floating-open-modes-tests
+          javac -encoding UTF-8 -d build/floating-open-modes-tests \
+            "$src/FloatingOpenModeLogic.java" \
+            "$src/FloatingBarGestureLogic.java" \
+            tests/com/smarttoolbox/pro/FloatingOpenModeLogicTest.java \
+            tests/com/smarttoolbox/pro/FloatingBarGestureLogicTest.java
+          java -cp build/floating-open-modes-tests com.smarttoolbox.pro.FloatingOpenModeLogicTest
+          java -cp build/floating-open-modes-tests com.smarttoolbox.pro.FloatingBarGestureLogicTest
+
       - name: Verify floating bar swipe opens controls in Home and other apps
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
