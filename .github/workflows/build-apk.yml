@@ -658,6 +658,32 @@ jobs:
             tests/com/smarttoolbox/pro/MessageScheduleLogicTest.java
           java -cp build/message-scheduler-tests com.smarttoolbox.pro.MessageScheduleLogicTest
 
+      - name: Verify opening brand animation and consolidated group cards
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/BrandSplashActivity.java"
+          test -f "$src/SchedulerBatchUiLogic.java"
+          test -f tests/com/smarttoolbox/pro/SchedulerBatchUiLogicTest.java
+          grep -Fq 'android:name=".BrandSplashActivity" android:exported="true"' app/src/main/AndroidManifest.xml
+          grep -Fq 'android:name=".MainActivity" android:exported="true"' app/src/main/AndroidManifest.xml
+          grep -Fq 'Created by Shahriar Rahman' "$src/BrandSplashActivity.java"
+          grep -Fq 'SR CREATION FARM' "$src/BrandSplashActivity.java"
+          grep -Fq '@SRCreation-farm' "$src/BrandSplashActivity.java"
+          grep -Fq 'fb.com/srcreation.farm' "$src/BrandSplashActivity.java"
+          grep -Fq 'main.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)' "$src/BrandSplashActivity.java"
+          grep -Fq 'SchedulerBatchUiLogic.cardKey(item.id, item.batchId)' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'addScheduleGroupCard(content, batch)' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'MessageScheduleStore.deleteBatch(this, lead.batchId)' "$src/MessageSchedulerActivity.java"
+          grep -Fq 'static synchronized void deleteBatch(Context context, String batchId)' "$src/MessageScheduleStore.java"
+          mkdir -p build/group-card-tests
+          javac -encoding UTF-8 -d build/group-card-tests \
+            "$src/SchedulerBatchUiLogic.java" \
+            tests/com/smarttoolbox/pro/SchedulerBatchUiLogicTest.java
+          java -cp build/group-card-tests com.smarttoolbox.pro.SchedulerBatchUiLogicTest
+
       - name: Verify collapsible scheduler inbox sections and local-date grouping
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
