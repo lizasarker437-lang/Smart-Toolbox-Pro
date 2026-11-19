@@ -658,6 +658,43 @@ jobs:
             tests/com/smarttoolbox/pro/MessageScheduleLogicTest.java
           java -cp build/message-scheduler-tests com.smarttoolbox.pro.MessageScheduleLogicTest
 
+      - name: Verify premium and classic interface modes with original UI sound packs
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'code=$?; echo "::error title=Premium UI tests::Failed line $LINENO: $BASH_COMMAND [exit $code]"; exit $code' ERR
+          src=app/src/main/java/com/smarttoolbox/pro
+          test -f "$src/PremiumExperience.java"
+          test -f "$src/PremiumExperienceLogic.java"
+          test -f "$src/UiSound.java"
+          test -f tests/com/smarttoolbox/pro/PremiumExperienceLogicTest.java
+          test -s app/src/main/res/drawable-nodpi/ic_launcher.png
+          test -s app/src/main/res/drawable-nodpi/sr_premium_logo.png
+          grep -Fq 'PremiumExperience.setStyle(context, style)' "$src/ThemeManager.java"
+          grep -Fq 'Ui.applyPremiumLook(PremiumExperience.premium(context)' "$src/ThemeManager.java"
+          grep -Fq 'GradientDrawable.Orientation.TL_BR' "$src/Ui.java"
+          grep -Fq 'PremiumExperience.motion(a)' "$src/Ui.java"
+          grep -Fq 'PremiumExperienceLogic.CLASSIC' "$src/ThemeSettingsActivity.java"
+          grep -Fq 'PremiumExperienceLogic.PREMIUM' "$src/ThemeSettingsActivity.java"
+          grep -Fq 'PremiumExperience.setSounds(this' "$src/ThemeSettingsActivity.java"
+          grep -Fq 'PremiumExperience.setPack(this' "$src/ThemeSettingsActivity.java"
+          grep -Fq 'PremiumExperience.setMotion(this' "$src/ThemeSettingsActivity.java"
+          grep -Fq 'UiSound.play(this, UiSound.INTRO)' "$src/BrandSplashActivity.java"
+          grep -Fq 'R.drawable.sr_premium_logo' "$src/MainActivity.java"
+          grep -Fq 'UiSound.play(this, UiSound.NAVIGATE)' "$src/FloatingControlService.java"
+          test "$(find app/src/main/res/raw -name 'sr_*.wav' -type f | wc -l)" -eq 16
+          for style in soft digital crystal arcade; do
+            for action in tap open success intro; do
+              test -s "app/src/main/res/raw/sr_${style}_${action}.wav"
+            done
+          done
+          mkdir -p build/premium-experience-tests
+          javac -encoding UTF-8 -d build/premium-experience-tests \
+            "$src/PremiumExperienceLogic.java" \
+            tests/com/smarttoolbox/pro/PremiumExperienceLogicTest.java
+          java -cp build/premium-experience-tests com.smarttoolbox.pro.PremiumExperienceLogicTest
+
       - name: Verify opening brand animation and consolidated group cards
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
