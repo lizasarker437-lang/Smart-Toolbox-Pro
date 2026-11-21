@@ -37,65 +37,49 @@ jobs:
               os.environ["GITHUB_WORKSPACE"]
           ).resolve()
 
-          def find_project():
-              result = []
-              for name in (
-                  "settings.gradle",
-                  "settings.gradle.kts"
-              ):
-                  for file in root.rglob(name):
-                      folder = file.parent
-                      if (
-                          (folder / "app/build.gradle").is_file()
-                          or (folder / "app/build.gradle.kts").is_file()
-                      ):
-                          result.append(folder)
-              return sorted(
-                  set(result),
-                  key=lambda p: (len(p.parts), str(p))
-              )
+          def find_projects():
+              found = []
+              for name in ("settings.gradle",
+                           "settings.gradle.kts"):
+                  for f in root.rglob(name):
+                      p = f.parent
+                      if ((p / "app/build.gradle").is_file()
+                          or (p / "app/build.gradle.kts").is_file()):
+                          found.append(p)
+              return sorted(set(found),
+                            key=lambda p: (len(p.parts), str(p)))
 
-          projects = find_project()
+          projects = find_projects()
           processed = set()
 
           for round_no in range(5):
               if projects:
                   break
-
               archives = [
                   p for p in sorted(root.rglob("*.zip"))
                   if p not in processed
               ]
-
               if not archives:
                   break
 
               for index, archive in enumerate(archives):
                   processed.add(archive)
-                  dest = (
-                      root / "_android_extracted"
-                      / str(round_no) / str(index)
-                  )
-                  dest.mkdir(
-                      parents=True, exist_ok=True
-                  )
+                  dest = (root / "_android_extracted"
+                          / str(round_no) / str(index))
+                  dest.mkdir(parents=True, exist_ok=True)
 
                   try:
                       with zipfile.ZipFile(archive) as z:
                           base = dest.resolve()
                           for item in z.infolist():
-                              target = (
-                                  base / item.filename
-                              ).resolve()
+                              target = (base / item.filename).resolve()
                               if not target.is_relative_to(base):
-                                  raise ValueError(
-                                      "Unsafe ZIP path"
-                                  )
+                                  raise ValueError("Unsafe ZIP path")
                           z.extractall(dest)
                   except (zipfile.BadZipFile, ValueError) as e:
                       print("Skipped ZIP:", e)
 
-              projects = find_project()
+              projects = find_projects()
 
           if not projects:
               raise SystemExit(
@@ -104,13 +88,8 @@ jobs:
 
           project = projects[0]
           print("PROJECT FOUND:", project)
-
-          with open(
-              os.environ["GITHUB_ENV"], "a"
-          ) as f:
-              f.write(
-                  "PROJECT_DIR=" + str(project) + "\n"
-              )
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write("PROJECT_DIR=" + str(project) + "\n")
           PY
 
       - name: Configure Android SDK
@@ -118,23 +97,19 @@ jobs:
         run: |
           set -euo pipefail
           SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
-
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
-
           SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager 2>/dev/null | sort -V | tail -n 1)"
-
-          test -n "$SDKMANAGER" || exit 1
+          test -n "$SDKMANAGER"
           echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
 
-      - name: Install Android SDK packages
+      - name: Install Android SDK
         shell: bash
         run: |
           set -euo pipefail
           yes | "$SDKMANAGER" \
             --sdk_root="$ANDROID_SDK_ROOT" \
             --licenses >/dev/null || true
-
           "$SDKMANAGER" \
             --sdk_root="$ANDROID_SDK_ROOT" \
             --install \
@@ -152,7 +127,6 @@ jobs:
         run: |
           set -euo pipefail
           cd "$PROJECT_DIR"
-
           if [ -f gradlew ]; then
             chmod +x gradlew
             ./gradlew --no-daemon --stacktrace assembleDebug
