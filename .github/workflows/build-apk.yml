@@ -4,7 +4,9 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, master]
+    branches:
+      - main
+      - master
 
 permissions:
   contents: read
@@ -12,10 +14,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
-      - name: Checkout repository
+      - name: Checkout source
         uses: actions/checkout@v4
 
       - name: Set up Java 17
@@ -24,111 +26,141 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Locate Android project (folders or ZIP)
+      - name: Find and extract Android project
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PYTHON'
-          import os, pathlib, zipfile
+
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import zipfile
 
           root = pathlib.Path(
-              os.environ['GITHUB_WORKSPACE']
+              os.environ["GITHUB_WORKSPACE"]
           ).resolve()
 
-          def candidates():
+          extracted = root / "_android_extracted"
+          extracted.mkdir(exist_ok=True)
+
+          def find_project():
+              matches = []
+              for name in (
+                  "settings.gradle",
+                  "settings.gradle.kts"
+              ):
+                  for file in root.rglob(name):
+                      if ".git" in file.parts:
+                          continue
+                      folder = file.parent
+                      if (
+                          (folder / "app/build.gradle").is_file()
+                          or
+                          (folder / "app/build.gradle.kts").is_file()
+                      ):
+                          matches.append(folder)
               return sorted(
-                  (
-                      p.parent
-                      for p in root.rglob('settings.gradle')
-                      if '.git' not in p.parts
-                  ),
-                  key=lambda p: (len(p.parts), str(p))
-              ) + sorted(
-                  (
-                      p.parent
-                      for p in root.rglob('settings.gradle.kts')
-                      if '.git' not in p.parts
-                  ),
+                  set(matches),
                   key=lambda p: (len(p.parts), str(p))
               )
 
-          found = candidates()
+          projects = find_project()
 
-          if not found:
-              archives = sorted(root.rglob('*.zip'))
+          if not projects:
+              processed = set()
 
-              for archive in archives:
-                  if '.git' in archive.parts:
-                      continue
+              for round_number in range(5):
+                  archives = sorted(root.rglob("*.zip"))
+                  pending = [
+                      p for p in archives
+                      if p not in processed
+                      and ".git" not in p.parts
+                  ]
 
-                  print(
-                      'Inspecting ZIP:',
-                      archive.relative_to(root)
-                  )
-
-                  with zipfile.ZipFile(archive) as z:
-                      names = z.namelist()
-
-                      if not any(
-                          n.endswith((
-                              'settings.gradle',
-                              'settings.gradle.kts'
-                          ))
-                          for n in names
-                      ):
-                          continue
-
-                      dest = (
-                          root / '_extracted_android_project'
-                      )
-                      dest.mkdir(exist_ok=True)
-
-                      for info in z.infolist():
-                          target = (
-                              dest / info.filename
-                          ).resolve()
-
-                          if not target.is_relative_to(
-                              dest.resolve()
-                          ):
-                              raise RuntimeError(
-                                  'Unsafe ZIP path'
-                              )
-
-                      z.extractall(dest)
-
-                  found = candidates()
-
-                  if found:
+                  if not pending:
                       break
 
-          if not found:
+                  for index, archive in enumerate(pending):
+                      processed.add(archive)
+
+                      print("Checking:", archive)
+
+                      try:
+                          with zipfile.ZipFile(archive) as z:
+                              destination = (
+                                  extracted
+                                  / ("round_" + str(round_number))
+                                  / str(index)
+                              )
+                              destination.mkdir(
+                                  parents=True,
+                                  exist_ok=True
+                              )
+
+                              base = destination.resolve()
+
+                              for item in z.infolist():
+                                  target = (
+                                      base / item.filename
+                                  ).resolve()
+
+                                  if not target.is_relative_to(base):
+                                      raise ValueError(
+                                          "Unsafe ZIP path"
+                                      )
+
+                                  if item.is_dir():
+                                      target.mkdir(
+                                          parents=True,
+                                          exist_ok=True
+                                      )
+                                  else:
+                                      target.parent.mkdir(
+                                          parents=True,
+                                          exist_ok=True
+                                      )
+                                      with z.open(item) as src:
+                                          with open(target, "wb") as dst:
+                                              import shutil
+                                              shutil.copyfileobj(src, dst)
+
+                      except (zipfile.BadZipFile, ValueError) as e:
+                          print("ZIP error:", e)
+                          continue
+
+                  projects = find_project()
+                  if projects:
+                      break
+
+          if not projects:
+              print("Repository files:")
+              for p in list(root.iterdir())[:50]:
+                  print(p.relative_to(root))
+
               raise SystemExit(
-                  'ERROR: No settings.gradle found. '
-                  'Upload/extract Android source.'
+                  "ERROR: Android Gradle project not found. "
+                  "Upload the full Android source ZIP."
               )
 
-          project = next(
-              (
-                  p for p in found
-                  if (p/'app'/'build.gradle').exists()
-                  or (p/'app'/'build.gradle.kts').exists()
-              ),
-              found[0]
-          )
-
-          print(
-              'Android project root:',
-              project.relative_to(root)
-          )
+          project = projects[0]
+          print("PROJECT FOUND:", project)
 
           with open(
-              os.environ['GITHUB_ENV'], 'a'
+              os.environ["GITHUB_ENV"],
+              "a",
+              encoding="utf-8"
+          ) as f:
+              f.write("PROJECT_DIR=" + str(project) + "\n")
+
+          with open(
+              os.environ["GITHUB_STEP_SUMMARY"],
+              "a",
+              encoding="utf-8"
           ) as f:
               f.write(
-                  'PROJECT_DIR=' + str(project) + '\n'
+                  "Android project: `" + str(project) + "`\n"
               )
-          PYTHON
+          PY
 
       - name: Configure Android SDK
         shell: bash
@@ -142,14 +174,14 @@ jobs:
 
           SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager 2>/dev/null | sort -V | tail -n 1)"
 
-          test -n "$SDKMANAGER" || {
-            echo 'sdkmanager not found'
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found"
             exit 1
-          }
+          fi
 
           echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
 
-      - name: Install Android SDK packages
+      - name: Install Android SDK
         shell: bash
         run: |
           set -euo pipefail
@@ -161,21 +193,33 @@ jobs:
           "$SDKMANAGER" \
             --sdk_root="$ANDROID_SDK_ROOT" \
             --install \
-            'platform-tools' \
-            'platforms;android-36' \
-            'build-tools;36.0.0'
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
 
-      - name: Build debug APK
+      - name: Verify Gradle project
         shell: bash
         run: |
           set -euo pipefail
+          echo "Project directory: $PROJECT_DIR"
+          ls -la "$PROJECT_DIR"
 
-          cd "$PROJECT_DIR"
+          if [ ! -f "$PROJECT_DIR/settings.gradle" ] && \
+             [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
+            echo "ERROR: settings.gradle missing"
+            exit 1
+          fi
+
+      - name: Build debug APK
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
 
           if [ -f gradlew ]; then
             chmod +x gradlew
@@ -185,8 +229,11 @@ jobs:
           fi
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: SmartToolboxPro-debug-apk
-          path: '**/build/outputs/apk/debug/*.apk'
+          path: |
+            **/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+          retention-days: 30
