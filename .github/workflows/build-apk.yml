@@ -38,7 +38,7 @@ jobs:
           ).resolve()
 
           def find_project():
-              found = []
+              result = []
               for name in (
                   "settings.gradle",
                   "settings.gradle.kts"
@@ -46,13 +46,12 @@ jobs:
                   for file in root.rglob(name):
                       folder = file.parent
                       if (
-                          (folder / "app/build.gradle").exists()
-                          or
-                          (folder / "app/build.gradle.kts").exists()
+                          (folder / "app/build.gradle").is_file()
+                          or (folder / "app/build.gradle.kts").is_file()
                       ):
-                          found.append(folder)
+                          result.append(folder)
               return sorted(
-                  set(found),
+                  set(result),
                   key=lambda p: (len(p.parts), str(p))
               )
 
@@ -77,7 +76,9 @@ jobs:
                       root / "_android_extracted"
                       / str(round_no) / str(index)
                   )
-                  dest.mkdir(parents=True, exist_ok=True)
+                  dest.mkdir(
+                      parents=True, exist_ok=True
+                  )
 
                   try:
                       with zipfile.ZipFile(archive) as z:
@@ -87,7 +88,9 @@ jobs:
                                   base / item.filename
                               ).resolve()
                               if not target.is_relative_to(base):
-                                  raise ValueError("Unsafe ZIP path")
+                                  raise ValueError(
+                                      "Unsafe ZIP path"
+                                  )
                           z.extractall(dest)
                   except (zipfile.BadZipFile, ValueError) as e:
                       print("Skipped ZIP:", e)
@@ -96,7 +99,7 @@ jobs:
 
           if not projects:
               raise SystemExit(
-                  "ERROR: Android Gradle project not found"
+                  "Android Gradle project not found"
               )
 
           project = projects[0]
@@ -105,7 +108,9 @@ jobs:
           with open(
               os.environ["GITHUB_ENV"], "a"
           ) as f:
-              f.write("PROJECT_DIR=" + str(project) + "\n")
+              f.write(
+                  "PROJECT_DIR=" + str(project) + "\n"
+              )
           PY
 
       - name: Configure Android SDK
