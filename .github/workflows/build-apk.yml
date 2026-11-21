@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: Checkout source
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Java 17
@@ -24,46 +24,169 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Locate Android project (folders or ZIP)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTHON'
+          import os, pathlib, zipfile
+
+          root = pathlib.Path(
+              os.environ['GITHUB_WORKSPACE']
+          ).resolve()
+
+          def candidates():
+              return sorted(
+                  (
+                      p.parent
+                      for p in root.rglob('settings.gradle')
+                      if '.git' not in p.parts
+                  ),
+                  key=lambda p: (len(p.parts), str(p))
+              ) + sorted(
+                  (
+                      p.parent
+                      for p in root.rglob('settings.gradle.kts')
+                      if '.git' not in p.parts
+                  ),
+                  key=lambda p: (len(p.parts), str(p))
+              )
+
+          found = candidates()
+
+          if not found:
+              archives = sorted(root.rglob('*.zip'))
+
+              for archive in archives:
+                  if '.git' in archive.parts:
+                      continue
+
+                  print(
+                      'Inspecting ZIP:',
+                      archive.relative_to(root)
+                  )
+
+                  with zipfile.ZipFile(archive) as z:
+                      names = z.namelist()
+
+                      if not any(
+                          n.endswith((
+                              'settings.gradle',
+                              'settings.gradle.kts'
+                          ))
+                          for n in names
+                      ):
+                          continue
+
+                      dest = (
+                          root / '_extracted_android_project'
+                      )
+                      dest.mkdir(exist_ok=True)
+
+                      for info in z.infolist():
+                          target = (
+                              dest / info.filename
+                          ).resolve()
+
+                          if not target.is_relative_to(
+                              dest.resolve()
+                          ):
+                              raise RuntimeError(
+                                  'Unsafe ZIP path'
+                              )
+
+                      z.extractall(dest)
+
+                  found = candidates()
+
+                  if found:
+                      break
+
+          if not found:
+              raise SystemExit(
+                  'ERROR: No settings.gradle found. '
+                  'Upload/extract Android source.'
+              )
+
+          project = next(
+              (
+                  p for p in found
+                  if (p/'app'/'build.gradle').exists()
+                  or (p/'app'/'build.gradle.kts').exists()
+              ),
+              found[0]
+          )
+
+          print(
+              'Android project root:',
+              project.relative_to(root)
+          )
+
+          with open(
+              os.environ['GITHUB_ENV'], 'a'
+          ) as f:
+              f.write(
+                  'PROJECT_DIR=' + str(project) + '\n'
+              )
+          PYTHON
+
       - name: Configure Android SDK
         shell: bash
         run: |
           set -euo pipefail
+
           SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
 
           SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager 2>/dev/null | sort -V | tail -n 1)"
 
-          if [ -z "$SDKMANAGER" ]; then
-            echo 'No sdkmanager found on GitHub runner.' >&2
+          test -n "$SDKMANAGER" || {
+            echo 'sdkmanager not found'
             exit 1
-          fi
+          }
 
           echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
-          echo "Using $SDKMANAGER"
 
-      - name: Install required Android SDK packages
+      - name: Install Android SDK packages
         shell: bash
         run: |
           set -euo pipefail
-          yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --licenses > /dev/null || true
 
-          "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --install \
+          yes | "$SDKMANAGER" \
+            --sdk_root="$ANDROID_SDK_ROOT" \
+            --licenses >/dev/null || true
+
+          "$SDKMANAGER" \
+            --sdk_root="$ANDROID_SDK_ROOT" \
+            --install \
             'platform-tools' \
             'platforms;android-36' \
             'build-tools;36.0.0'
 
-      - name: Set up Gradle 8.13
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
 
       - name: Build debug APK
-        run: gradle --no-daemon --stacktrace assembleDebug
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd "$PROJECT_DIR"
+
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew --no-daemon --stacktrace assembleDebug
+          else
+            gradle --no-daemon --stacktrace assembleDebug
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: SmartToolboxPro-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: '**/build/outputs/apk/debug/*.apk'
           if-no-files-found: error
